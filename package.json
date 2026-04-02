@@ -1,0 +1,46 @@
+{
+  "name": "space-nft-marketplace",
+  "version": "1.0.0",
+  "description": "For my NFT Marketplace, I chose the theme of the space invaders, I will procedurally generate 1000 different NFTs which will be sellable and buyable.",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "coverage": "hardhat coverage",
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
+    "upgrade:local": "hardhat run scripts/upgrade.ts --network localhost",
+    "upgrade:sepolia": "hardhat run scripts/upgrade.ts --network sepolia",
+    "mint:local": "hardhat run scripts/mintBatch.ts --network localhost",
+    "mint:sepolia": "hardhat run scripts/mintBatch.ts --network sepolia",
+    "copy:abis": "hardhat run scripts/copyAbis.ts",
+    "ipfs:upload": "hardhat run scripts/uploadToIPFS.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexandreeberhardt/Space-NFT-Marketplace.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/alexandreeberhardt/Space-NFT-Marketplace/issues"
+  },
+  "homepage": "https://github.com/alexandreeberhardt/Space-NFT-Marketplace#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
+    "@openzeppelin/contracts-upgradeable": "^5.6.1",
+    "@openzeppelin/hardhat-upgrades": "^3.9.1",
+    "@types/form-data": "^2.2.1",
+    "@types/node": "^25.5.0",
+    "@types/node-fetch": "^2.6.13",
+    "dotenv": "^17.4.0",
+    "form-data": "^4.0.5",
+    "hardhat": "^2.28.6",
+    "node-fetch": "^2.7.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.2"
+  }
+}
