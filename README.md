@@ -2,6 +2,22 @@
 
 For my NFT Marketplace, I chose the theme of the space invaders, I will procedurally generate 1000 different NFTs which will be sellable and buyable.
 
+## Python setup
+
+The procedural image generator depends on Python packages listed in `requirements.txt`.
+
+Install them with:
+
+```bash
+pip install -r requirements.txt
+```
+
+You can then generate the invader images with:
+
+```bash
+python3 generate_invaders.py
+```
+
 Here are 5 examples :
 
 <p align="center">
