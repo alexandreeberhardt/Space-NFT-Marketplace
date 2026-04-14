@@ -18,10 +18,10 @@ A decentralized NFT marketplace built on Ethereum (Sepolia testnet). Space Invad
 
 | Component | Technology | Notes |
 |---|---|---|
-| Smart contracts | Solidity 0.8.28 + OpenZeppelin v5 | NFT (V1→V2) via UUPS proxy, marketplace immuable |
+| Smart contracts | Solidity 0.8.28 + OpenZeppelin v5 | NFT (V1→V2) + Marketplace (V1→V2) via UUPS proxy |
 | Development framework | Hardhat v2 + TypeScript | Tests with Mocha/Chai |
 | NFT standard | ERC-721 + ERC-2981 (royalties) | `SpaceInvaderNFT.sol` |
-| Marketplace | Fixed-price sales + offer system | `SpaceMarketplace.sol` |
+| Marketplace | Fixed-price sales + offer system | `SpaceMarketplaceV1.sol` → `SpaceMarketplaceV2.sol` |
 | Storage | IPFS via Pinata | Images + metadata JSON |
 | Frontend | React + Vite + wagmi v2 + viem | MetaMask / WalletConnect |
 | Testnet | Ethereum Sepolia | chainId 11155111 |
@@ -38,15 +38,17 @@ Buyer (1 ETH)
 ### Deployment model
 
 ```
-SpaceInvaderNFT  -> UUPS proxy (v1) + upgrade to v2 (SpaceInvaderNFTV2)
-SpaceMarketplace -> direct immutable deployment
+SpaceInvaderNFT    -> UUPS proxy (v1) + upgrade to v2 (SpaceInvaderNFTV2)
+SpaceMarketplace   -> UUPS proxy (v1) + upgrade to v2 (SpaceMarketplaceV2)
 ```
 
 ---
 
+> **Node.js version**: Use Node.js **v22 LTS**. Node v25+ is incompatible with Hardhat and will produce a `MODULE_NOT_FOUND` error. Use `nvm use 22` or check `.nvmrc`.
+
 ## Prerequisites
 
-- Node.js v18+ (v22 LTS recommended - Hardhat warns on v25)
+- Node.js **v22 LTS** (v18+ minimum — v25 breaks Hardhat)
 - Python 3.10+
 - MetaMask with Sepolia ETH ([faucet](https://sepoliafaucet.com) or [Alchemy](https://www.alchemy.com/faucets/ethereum-sepolia))
 - Pinata account (free tier) for IPFS uploads
@@ -97,7 +99,7 @@ npx hardhat run scripts/copyAbis.ts
 npx hardhat test
 ```
 
-Expected output: **18 tests passing** covering:
+Expected output: **19 tests passing** covering:
 1. Contract deployment
 2. NFT minting
 3. NFT listing
@@ -108,7 +110,8 @@ Expected output: **18 tests passing** covering:
 8. Duplicate listing prevention
 9. Incorrect ETH amount revert
 10. Marketplace safety checks
-11. **Upgrade v1 → v2** (state preservation + max-supply cap)
+11. **Upgrade SpaceMarketplace v1 → v2** (state preservation + offer system)
+12. **Upgrade SpaceInvaderNFT v1 → v2** (state preservation + max-supply cap)
 
 ```bash
 # With coverage (bonus):
@@ -157,13 +160,13 @@ npx hardhat run scripts/mintBatch.ts --network sepolia
 
 Addresses are saved to `deployments/sepolia.json`. Copy the NFT proxy address and marketplace address into `frontend/src/contracts/addresses.ts` under key `11155111`.
 
-### Upgrade NFT v1 → v2 (Sepolia)
+### Upgrade SpaceMarketplace v1 → v2 (Sepolia)
 
 ```bash
 npx hardhat run scripts/upgrade.ts --network sepolia
 ```
 
-This upgrades the `SpaceInvaderNFT` UUPS proxy to `SpaceInvaderNFTV2`, which adds an optional max-supply cap (`setMaxSupply`). All existing state (token ownership, URIs, royalties) is preserved. The proxy address stays the same; only the implementation address changes.
+This upgrades the `SpaceMarketplace` UUPS proxy to `SpaceMarketplaceV2`, which adds the offer system (`makeOffer` / `acceptOffer` / `withdrawOffer`). All existing listings and platform configuration are preserved. The proxy address stays the same; only the implementation address changes.
 
 ---
 
@@ -193,7 +196,7 @@ npm run build
 | Contract | Proxy / Address | Implementation | Explorer |
 |---|---|---|---|
 | SpaceInvaderNFT (proxy) | `0x3a5d2721257a26DaBdD6A14b64C0634ffC8dCCD3` | `0x2e99f91DC50D704e3339ecdCC943821a54A33fA8` (V1) | [Etherscan](https://sepolia.etherscan.io/address/0x3a5d2721257a26DaBdD6A14b64C0634ffC8dCCD3) |
-| SpaceMarketplace | `0xAA5038Faf52ac76EebFaa8C3865D8110B6f9369B` | immutable | [Etherscan](https://sepolia.etherscan.io/address/0xAA5038Faf52ac76EebFaa8C3865D8110B6f9369B) |
+| SpaceMarketplace (proxy) | `0xAA5038Faf52ac76EebFaa8C3865D8110B6f9369B` | `0x022E69F1664aEAB6C991B81142E0BcD751039ce3` (V2) | [Etherscan](https://sepolia.etherscan.io/address/0xAA5038Faf52ac76EebFaa8C3865D8110B6f9369B) |
 
 The NFT implementation and the marketplace contract are verified on Etherscan.
 
@@ -207,7 +210,7 @@ The NFT implementation and the marketplace contract are verified on Etherscan.
 - **Custom errors** used throughout for gas efficiency.
 - **Input validation** on all public entry points (`ZeroPrice`, `ZeroAddress`, `FeeTooHigh`).
 - **Private key** never committed - use `.env` (gitignored).
-- **SpaceMarketplace is immutable**: no proxy, no upgrade admin, deployed directly.
+- **SpaceMarketplace is upgradeable via UUPS**: V1 deployed as proxy, upgraded to V2 (adds offer system). `_authorizeUpgrade` gated by `onlyOwner`.
 - **SpaceInvaderNFT UUPS upgrade** gated by `onlyOwner` via `_authorizeUpgrade`. V2 adds `setMaxSupply`.
 - **Platform fee** capped at 10% (1000 bps) to prevent owner rug.
 
@@ -223,7 +226,9 @@ The NFT implementation and the marketplace contract are verified on Etherscan.
 
 4. **List an NFT you own** — go to "List NFT", enter a token ID you own, approve the marketplace (Step 1), then set a price and list (Step 2). Two transactions, each confirmed on-chain.
 
-5. **Mint an NFT** — go to "Mint (Owner)", paste an IPFS metadata URI (e.g. from `scripts/tokenURIs.json`), and confirm the transaction.
+5. **Mint an NFT** — go to "Mint", paste an IPFS metadata URI (e.g. from `scripts/tokenURIs.json`), and confirm the transaction.
+
+5b. **Place / accept / withdraw an offer** — go to "Offers". Use "Make Offer" to bid on any token, "Accept Offer" to accept a bid (approve first), or "Withdraw Offer" to reclaim your ETH.
 
 6. **Proof of deployment** — the deployed contract addresses on Sepolia are linked in the "Deployed Contracts" section above. Both the NFT implementation and the marketplace are verified on Etherscan.
 
@@ -237,10 +242,11 @@ The NFT implementation and the marketplace contract are verified on Etherscan.
 contracts/
   SpaceInvaderNFT.sol        ERC-721 + ERC-2981, UUPS (v1)
   SpaceInvaderNFTV2.sol      ERC-721 + ERC-2981, UUPS (v2 – adds setMaxSupply)
-  SpaceMarketplace.sol       Fixed-price marketplace + offer system, immutable
+  SpaceMarketplaceV1.sol     Fixed-price marketplace, UUPS proxy (v1)
+  SpaceMarketplaceV2.sol     Extends V1 with offer system (v2)
 scripts/
-  deploy.ts                  Deploy NFT proxy + immutable marketplace
-  upgrade.ts                 Upgrade SpaceInvaderNFT proxy v1 → v2
+  deploy.ts                  Deploy NFT proxy + marketplace V1 proxy
+  upgrade.ts                 Upgrade SpaceMarketplace proxy v1 → v2
   mintBatch.ts               Mint 20 NFTs on-chain
   uploadToIPFS.ts            Upload images + metadata to Pinata
   extract_attributes.py      Extract seed/color attributes

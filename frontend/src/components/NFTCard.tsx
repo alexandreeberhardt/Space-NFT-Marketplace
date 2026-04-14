@@ -13,12 +13,13 @@ interface Metadata {
 
 interface NFTCardProps {
   tokenId: bigint;
-  seller: string;
-  price: bigint;
+  seller?: string;
+  price?: bigint;
+  active?: boolean;
   onPurchased?: () => void;
 }
 
-export function NFTCard({ tokenId, seller, price, onPurchased }: NFTCardProps) {
+export function NFTCard({ tokenId, seller, price, active = false, onPurchased }: NFTCardProps) {
   const chainId = useChainId();
   const { buy, isPending, isConfirmed } = useBuyNFT(chainId);
   const { data: tokenURIData } = useTokenURI(tokenId, chainId);
@@ -26,7 +27,6 @@ export function NFTCard({ tokenId, seller, price, onPurchased }: NFTCardProps) {
   const [metadata, setMetadata] = useState<Metadata | null>(null);
   const [error, setError] = useState("");
 
-  // Fetch metadata from IPFS
   useEffect(() => {
     if (!tokenURIData) return;
     const url = ipfsToHttp(tokenURIData as string);
@@ -36,7 +36,6 @@ export function NFTCard({ tokenId, seller, price, onPurchased }: NFTCardProps) {
       .catch(() => setMetadata(null));
   }, [tokenURIData]);
 
-  // Notify parent on successful purchase
   useEffect(() => {
     if (isConfirmed && onPurchased) onPurchased();
   }, [isConfirmed, onPurchased]);
@@ -44,7 +43,7 @@ export function NFTCard({ tokenId, seller, price, onPurchased }: NFTCardProps) {
   const handleBuy = async () => {
     setError("");
     try {
-      await buy(tokenId, price);
+      await buy(tokenId, price!);
     } catch (e) {
       setError(formatError(e));
     }
@@ -63,10 +62,18 @@ export function NFTCard({ tokenId, seller, price, onPurchased }: NFTCardProps) {
 
       <div className="nft-info">
         <h3>{metadata?.name || `Space Invader #${tokenId}`}</h3>
-        <p className="price">{formatEther(price)} ETH</p>
-        <p className="seller">
-          Seller: {seller.slice(0, 6)}...{seller.slice(-4)}
-        </p>
+
+        {active && price !== undefined ? (
+          <p className="price">{formatEther(price)} ETH</p>
+        ) : (
+          <p className="price not-listed">Not listed</p>
+        )}
+
+        {active && seller && (
+          <p className="seller">
+            Seller: {seller.slice(0, 6)}...{seller.slice(-4)}
+          </p>
+        )}
 
         {metadata?.attributes && (
           <div className="attributes">
@@ -79,13 +86,15 @@ export function NFTCard({ tokenId, seller, price, onPurchased }: NFTCardProps) {
         )}
       </div>
 
-      <button
-        onClick={handleBuy}
-        disabled={isPending || isConfirmed}
-        className="buy-btn"
-      >
-        {isPending ? "Confirming..." : isConfirmed ? "Purchased!" : "Buy Now"}
-      </button>
+      {active && price !== undefined && (
+        <button
+          onClick={handleBuy}
+          disabled={isPending || isConfirmed}
+          className="buy-btn"
+        >
+          {isPending ? "Confirming..." : isConfirmed ? "Purchased!" : "Buy Now"}
+        </button>
+      )}
 
       {error && <p className="error">{error}</p>}
     </div>

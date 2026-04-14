@@ -3,8 +3,7 @@ import { useChainId } from "wagmi";
 import { useListing, useTotalSupply } from "../hooks/useNFTMarket";
 import { NFTCard } from "./NFTCard";
 
-/** Renders a single listing row and conditionally shows NFTCard if active */
-function ListingRow({
+function TokenRow({
   tokenId,
   onPurchased,
 }: {
@@ -16,13 +15,13 @@ function ListingRow({
 
   if (!data) return null;
   const [seller, price, active] = data as [string, bigint, boolean];
-  if (!active) return null;
 
   return (
     <NFTCard
       tokenId={tokenId}
       seller={seller}
       price={price}
+      active={active}
       onPurchased={onPurchased}
     />
   );
@@ -50,10 +49,10 @@ export function Gallery() {
 
   return (
     <div className="gallery" key={refreshKey}>
-      <h2>Active Listings</h2>
+      <h2>NFT Collection</h2>
       <div className="nft-grid">
         {Array.from({ length: total }, (_, i) => (
-          <ListingRow
+          <TokenRow
             key={i + 1}
             tokenId={BigInt(i + 1)}
             onPurchased={handlePurchased}

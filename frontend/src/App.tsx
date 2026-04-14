@@ -4,10 +4,11 @@ import { ConnectButton } from "./components/ConnectButton";
 import { Gallery } from "./components/Gallery";
 import { ListForm } from "./components/ListForm";
 import { MintForm } from "./components/MintForm";
+import { OfferForm } from "./components/OfferForm";
 import { sepolia } from "./wagmi.config";
 import "./App.css";
 
-type Tab = "gallery" | "list" | "mint";
+type Tab = "gallery" | "list" | "offers" | "mint";
 
 export default function App() {
   const { address, isConnected } = useAccount();
@@ -46,10 +47,16 @@ export default function App() {
             List NFT
           </button>
           <button
+            className={tab === "offers" ? "active" : ""}
+            onClick={() => setTab("offers")}
+          >
+            Offers
+          </button>
+          <button
             className={tab === "mint" ? "active" : ""}
             onClick={() => setTab("mint")}
           >
-            Mint (Owner)
+            Mint
           </button>
         </nav>
       )}
@@ -63,6 +70,7 @@ export default function App() {
 
         {isConnected && !isWrongNetwork && tab === "gallery" && <Gallery />}
         {isConnected && !isWrongNetwork && tab === "list" && <ListForm />}
+        {isConnected && !isWrongNetwork && tab === "offers" && <OfferForm />}
         {isConnected && !isWrongNetwork && tab === "mint" && <MintForm />}
       </main>
 

@@ -602,6 +602,51 @@ footer p::before {
   opacity: 0.5;
 }
 
+/* === Not-listed badge === */
+.price.not-listed {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.75em;
+}
+
+/* === Offer sub-tabs === */
+.offer-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 0.75rem;
+}
+
+.offer-tabs button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 0.35rem 0.85rem;
+  font-family: var(--pixel);
+  font-size: 0.48rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.offer-tabs button.active,
+.offer-tabs button:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.offer-panel {
+  padding-top: 0.5rem;
+}
+
+/* === Form hint === */
+.form-hint {
+  color: var(--text-muted);
+  font-size: 0.75em;
+  margin-bottom: 1.25rem;
+  line-height: 1.8;
+}
+
 /* === Scrollbar - pixel style === */
 ::-webkit-scrollbar {
   width: 6px;
