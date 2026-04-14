@@ -10,8 +10,6 @@
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
-    "upgrade:local": "hardhat run scripts/upgrade.ts --network localhost",
-    "upgrade:sepolia": "hardhat run scripts/upgrade.ts --network sepolia",
     "mint:local": "hardhat run scripts/mintBatch.ts --network localhost",
     "mint:sepolia": "hardhat run scripts/mintBatch.ts --network sepolia",
     "copy:abis": "hardhat run scripts/copyAbis.ts",

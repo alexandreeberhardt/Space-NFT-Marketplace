@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 
 
 OUTPUT_DIR = "./invaders"
-INVADER_COUNT = 5
+INVADER_COUNT = 20
 
 
 def generate_background_grid(canvas_grid_size, rng):
