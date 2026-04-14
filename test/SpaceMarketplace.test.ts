@@ -370,6 +370,71 @@ describe("8 - Duplicate listing prevention", () => {
 
 // Test 9 - Incorrect ETH amount revert
 
+// Test 11 - Upgrade v1 → v2
+
+describe("11 - Upgrade v1 → v2 (state preservation + new feature)", () => {
+  it("preserves all V1 state and unlocks the max-supply cap after upgrade", async () => {
+    const [owner, seller] = await ethers.getSigners();
+
+    // 1. Deploy V1 via UUPS proxy
+    const V1Factory = await ethers.getContractFactory("SpaceInvaderNFT");
+    const nftV1 = (await upgrades.deployProxy(
+      V1Factory,
+      [owner.address, 500],
+      { kind: "uups" }
+    )) as unknown as SpaceInvaderNFT;
+    await nftV1.waitForDeployment();
+    const proxyAddress = await nftV1.getAddress();
+
+    // 2. Modify state in V1: mint two tokens
+    await nftV1.connect(owner).safeMint(seller.address, "ipfs://QmV1/1.json");
+    await nftV1.connect(owner).safeMint(seller.address, "ipfs://QmV1/2.json");
+    expect(await nftV1.ownerOf(1n)).to.equal(seller.address);
+    expect(await nftV1.totalSupply()).to.equal(2n);
+
+    // 3. Upgrade proxy to V2
+    const V2Factory = await ethers.getContractFactory("SpaceInvaderNFTV2");
+    const nftV2 = (await upgrades.upgradeProxy(
+      proxyAddress,
+      V2Factory,
+      { kind: "uups", call: "initializeV2", unsafeAllow: ["missing-initializer"] }
+    )) as unknown as import("../typechain-types").SpaceInvaderNFTV2;
+    await nftV2.waitForDeployment();
+
+    // 4. Verify all V1 state is preserved
+    expect(await nftV2.getAddress()).to.equal(proxyAddress);
+    expect(await nftV2.ownerOf(1n)).to.equal(seller.address);
+    expect(await nftV2.ownerOf(2n)).to.equal(seller.address);
+    expect(await nftV2.totalSupply()).to.equal(2n);
+    expect(await nftV2.tokenURI(1n)).to.equal("ipfs://QmV1/1.json");
+    expect(await nftV2.owner()).to.equal(owner.address);
+
+    // 5. Verify new V2 feature: maxSupply defaults to 0 (no cap)
+    expect(await nftV2.maxSupply()).to.equal(0n);
+
+    // 6. Owner sets a cap of 4 tokens (2 already minted)
+    await expect(nftV2.connect(owner).setMaxSupply(4n))
+      .to.emit(nftV2, "MaxSupplyUpdated")
+      .withArgs(4n);
+    expect(await nftV2.maxSupply()).to.equal(4n);
+
+    // 7. Minting up to the cap succeeds
+    await nftV2.connect(owner).safeMint(seller.address, "ipfs://QmV2/3.json");
+    await nftV2.connect(owner).safeMint(seller.address, "ipfs://QmV2/4.json");
+    expect(await nftV2.totalSupply()).to.equal(4n);
+
+    // 8. Minting beyond the cap reverts with MaxSupplyReached
+    await expect(
+      nftV2.connect(owner).safeMint(seller.address, "ipfs://QmV2/5.json")
+    ).to.be.revertedWithCustomError(nftV2, "MaxSupplyReached");
+
+    // 9. Owner can remove the cap (set to 0) and mint again
+    await nftV2.connect(owner).setMaxSupply(0n);
+    await nftV2.connect(owner).safeMint(seller.address, "ipfs://QmV2/5.json");
+    expect(await nftV2.totalSupply()).to.equal(5n);
+  });
+});
+
 describe("9 - Incorrect ETH amount", () => {
   it("reverts buyNFT when msg.value does not match price", async () => {
     const { nft, market, seller, buyer } = await loadFixture(deployFixture);

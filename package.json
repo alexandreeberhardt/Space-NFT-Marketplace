@@ -13,7 +13,9 @@
     "mint:local": "hardhat run scripts/mintBatch.ts --network localhost",
     "mint:sepolia": "hardhat run scripts/mintBatch.ts --network sepolia",
     "copy:abis": "hardhat run scripts/copyAbis.ts",
-    "ipfs:upload": "hardhat run scripts/uploadToIPFS.ts"
+    "ipfs:upload": "hardhat run scripts/uploadToIPFS.ts",
+    "upgrade:local": "hardhat run scripts/upgrade.ts --network localhost",
+    "upgrade:sepolia": "hardhat run scripts/upgrade.ts --network sepolia"
   },
   "repository": {
     "type": "git",

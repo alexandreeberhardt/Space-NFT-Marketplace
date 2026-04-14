@@ -18,7 +18,7 @@ A decentralized NFT marketplace built on Ethereum (Sepolia testnet). Space Invad
 
 | Component | Technology | Notes |
 |---|---|---|
-| Smart contracts | Solidity 0.8.28 + OpenZeppelin v5 | NFT en UUPS, marketplace immuable |
+| Smart contracts | Solidity 0.8.28 + OpenZeppelin v5 | NFT (V1→V2) via UUPS proxy, marketplace immuable |
 | Development framework | Hardhat v2 + TypeScript | Tests with Mocha/Chai |
 | NFT standard | ERC-721 + ERC-2981 (royalties) | `SpaceInvaderNFT.sol` |
 | Marketplace | Fixed-price sales + offer system | `SpaceMarketplace.sol` |
@@ -38,7 +38,7 @@ Buyer (1 ETH)
 ### Deployment model
 
 ```
-SpaceInvaderNFT -> proxy + implementation
+SpaceInvaderNFT  -> UUPS proxy (v1) + upgrade to v2 (SpaceInvaderNFTV2)
 SpaceMarketplace -> direct immutable deployment
 ```
 
@@ -97,7 +97,7 @@ npx hardhat run scripts/copyAbis.ts
 npx hardhat test
 ```
 
-Expected output: **17 tests passing** covering:
+Expected output: **18 tests passing** covering:
 1. Contract deployment
 2. NFT minting
 3. NFT listing
@@ -107,6 +107,8 @@ Expected output: **17 tests passing** covering:
 7. Multi-collection state isolation
 8. Duplicate listing prevention
 9. Incorrect ETH amount revert
+10. Marketplace safety checks
+11. **Upgrade v1 → v2** (state preservation + max-supply cap)
 
 ```bash
 # With coverage (bonus):
@@ -155,6 +157,14 @@ npx hardhat run scripts/mintBatch.ts --network sepolia
 
 Addresses are saved to `deployments/sepolia.json`. Copy the NFT proxy address and marketplace address into `frontend/src/contracts/addresses.ts` under key `11155111`.
 
+### Upgrade NFT v1 → v2 (Sepolia)
+
+```bash
+npx hardhat run scripts/upgrade.ts --network sepolia
+```
+
+This upgrades the `SpaceInvaderNFT` UUPS proxy to `SpaceInvaderNFTV2`, which adds an optional max-supply cap (`setMaxSupply`). All existing state (token ownership, URIs, royalties) is preserved. The proxy address stays the same; only the implementation address changes.
+
 ---
 
 ## Frontend
@@ -182,8 +192,8 @@ npm run build
 
 | Contract | Proxy / Address | Implementation | Explorer |
 |---|---|---|---|
-| SpaceInvaderNFT | `0x2aDf2C54853056DD27c13d9A4d32B5B808758E16` | `0x2e99f91DC50D704e3339ecdCC943821a54A33fA8` | [Etherscan](https://sepolia.etherscan.io/address/0x2aDf2C54853056DD27c13d9A4d32B5B808758E16) |
-| SpaceMarketplace | `0x8a798F4f0CCb00e79c20D53cc1Ca33aee054c793` | immutable | [Etherscan](https://sepolia.etherscan.io/address/0x8a798F4f0CCb00e79c20D53cc1Ca33aee054c793) |
+| SpaceInvaderNFT (proxy) | `0x3a5d2721257a26DaBdD6A14b64C0634ffC8dCCD3` | `0x2e99f91DC50D704e3339ecdCC943821a54A33fA8` (V1) | [Etherscan](https://sepolia.etherscan.io/address/0x3a5d2721257a26DaBdD6A14b64C0634ffC8dCCD3) |
+| SpaceMarketplace | `0xAA5038Faf52ac76EebFaa8C3865D8110B6f9369B` | immutable | [Etherscan](https://sepolia.etherscan.io/address/0xAA5038Faf52ac76EebFaa8C3865D8110B6f9369B) |
 
 The NFT implementation and the marketplace contract are verified on Etherscan.
 
@@ -198,8 +208,26 @@ The NFT implementation and the marketplace contract are verified on Etherscan.
 - **Input validation** on all public entry points (`ZeroPrice`, `ZeroAddress`, `FeeTooHigh`).
 - **Private key** never committed - use `.env` (gitignored).
 - **SpaceMarketplace is immutable**: no proxy, no upgrade admin, deployed directly.
-- **SpaceInvaderNFT UUPS upgrade** gated by `onlyOwner` via `_authorizeUpgrade`.
+- **SpaceInvaderNFT UUPS upgrade** gated by `onlyOwner` via `_authorizeUpgrade`. V2 adds `setMaxSupply`.
 - **Platform fee** capped at 10% (1000 bps) to prevent owner rug.
+
+---
+
+## Demo procedure
+
+1. **Connect wallet** — open `http://localhost:5173` (or the deployed URL), click "Connect Wallet", select MetaMask on Sepolia testnet. The header shows your truncated address.
+
+2. **Browse the gallery** — the Gallery tab fetches all minted tokens and displays active listings with image, price, and seller address.
+
+3. **Buy an NFT** — click "Buy Now" on any listed card. MetaMask prompts a transaction for exactly the listed price. After 1 confirmation the card disappears from active listings.
+
+4. **List an NFT you own** — go to "List NFT", enter a token ID you own, approve the marketplace (Step 1), then set a price and list (Step 2). Two transactions, each confirmed on-chain.
+
+5. **Mint an NFT** — go to "Mint (Owner)", paste an IPFS metadata URI (e.g. from `scripts/tokenURIs.json`), and confirm the transaction.
+
+6. **Proof of deployment** — the deployed contract addresses on Sepolia are linked in the "Deployed Contracts" section above. Both the NFT implementation and the marketplace are verified on Etherscan.
+
+7. **Proof of v1 → v2 upgrade** — after running `npx hardhat run scripts/upgrade.ts --network sepolia`, the proxy address stays the same but the implementation address changes. The new implementation is visible on Etherscan under the proxy's "Read as Proxy" tab. The `setMaxSupply` function becomes available, while all existing token state is intact.
 
 ---
 
@@ -207,16 +235,18 @@ The NFT implementation and the marketplace contract are verified on Etherscan.
 
 ```
 contracts/
-  SpaceInvaderNFT.sol        ERC-721 + ERC-2981, UUPS
+  SpaceInvaderNFT.sol        ERC-721 + ERC-2981, UUPS (v1)
+  SpaceInvaderNFTV2.sol      ERC-721 + ERC-2981, UUPS (v2 – adds setMaxSupply)
   SpaceMarketplace.sol       Fixed-price marketplace + offer system, immutable
 scripts/
   deploy.ts                  Deploy NFT proxy + immutable marketplace
+  upgrade.ts                 Upgrade SpaceInvaderNFT proxy v1 → v2
   mintBatch.ts               Mint 20 NFTs on-chain
   uploadToIPFS.ts            Upload images + metadata to Pinata
   extract_attributes.py      Extract seed/color attributes
   copyAbis.ts                Copy ABIs to frontend
 test/
-  SpaceMarketplace.test.ts   17 automated tests
+  SpaceMarketplace.test.ts   18 automated tests (incl. upgrade v1→v2)
 frontend/
   src/
     wagmi.config.ts          Chain + connector config
