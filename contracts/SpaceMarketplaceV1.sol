@@ -1,37 +1,61 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 /**
- * @title SpaceMarketplace
- * @notice Fixed-price NFT marketplace with ERC-2981 royalty support and an
- *         ETH offer system for listed or unlisted tokens.
+ * @title SpaceMarketplaceV1
+ * @notice Fixed-price NFT marketplace with ERC-2981 royalty support.
+ *         Deployed behind a UUPS proxy. V2 adds an offer system.
+ *
+ * Security:
+ *  - Checks-Effects-Interactions pattern: listing deactivated, NFT transferred,
+ *    then ETH distributed.
+ *  - Reentrancy guard implemented inline (avoids OZ base constructor conflict).
+ *  - ETH sent via .call to support smart-contract wallets.
+ *  - Platform fee capped at 10%.
  */
-contract SpaceMarketplace is Ownable {
+contract SpaceMarketplaceV1 is
+    Initializable,
+    OwnableUpgradeable,
+    UUPSUpgradeable
+{
     struct Listing {
         address payable seller;
         uint256 price;
         bool active;
     }
 
+    // Storage (order must never change for upgrade safety)
     uint256 public platformFeeBps;
     address payable public feeRecipient;
-
     mapping(address => mapping(uint256 => Listing)) public listings;
-    mapping(address => mapping(uint256 => mapping(address => uint256)))
-        public offers;
+    uint256 private _reentrancyStatus; // 1 = not entered, 2 = entered
 
-    uint256 private _reentrancyStatus;
+    // Storage gap: 44 slots reserved for future versions.
+    uint256[44] private __gap;
+
+    // Reentrancy guard
+    error ReentrantCall();
+
+    modifier nonReentrant() {
+        if (_reentrancyStatus == 2) revert ReentrantCall();
+        _reentrancyStatus = 2;
+        _;
+        _reentrancyStatus = 1;
+    }
+
+    // Events
     event NFTListed(
         address indexed nftContract,
         uint256 indexed tokenId,
         address indexed seller,
         uint256 price
     );
-
     event NFTSold(
         address indexed nftContract,
         uint256 indexed tokenId,
@@ -39,32 +63,9 @@ contract SpaceMarketplace is Ownable {
         address buyer,
         uint256 price
     );
-
     event NFTDelisted(address indexed nftContract, uint256 indexed tokenId);
 
-    event OfferMade(
-        address indexed nftContract,
-        uint256 indexed tokenId,
-        address indexed bidder,
-        uint256 amount
-    );
-
-    event OfferAccepted(
-        address indexed nftContract,
-        uint256 indexed tokenId,
-        address indexed seller,
-        address bidder,
-        uint256 amount
-    );
-
-    event OfferWithdrawn(
-        address indexed nftContract,
-        uint256 indexed tokenId,
-        address indexed bidder,
-        uint256 amount
-    );
-
-    error ReentrantCall();
+    // Errors
     error ZeroPrice();
     error NotNFTOwner();
     error MarketplaceNotApproved();
@@ -75,30 +76,29 @@ contract SpaceMarketplace is Ownable {
     error FeeTooHigh();
     error ZeroAddress();
     error ETHTransferFailed();
-    error NoOfferToWithdraw();
-    error OfferAlreadyExists();
-    error NoOfferFromBidder();
-    error NotNFTOwnerForOffer();
     error InvalidRoyaltyAmount();
 
-    constructor(
+    // Initializer
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         uint256 _platformFeeBps,
         address payable _feeRecipient
-    ) Ownable(msg.sender) {
+    ) external initializer {
         if (_platformFeeBps > 1000) revert FeeTooHigh();
         if (_feeRecipient == address(0)) revert ZeroAddress();
+
+        __Ownable_init(msg.sender);
 
         platformFeeBps = _platformFeeBps;
         feeRecipient = _feeRecipient;
         _reentrancyStatus = 1;
     }
 
-    modifier nonReentrant() {
-        if (_reentrancyStatus == 2) revert ReentrantCall();
-        _reentrancyStatus = 2;
-        _;
-        _reentrancyStatus = 1;
-    }
+    // Listing
 
     function listNFT(
         address nftContract,
@@ -137,6 +137,14 @@ contract SpaceMarketplace is Ownable {
         emit NFTDelisted(nftContract, tokenId);
     }
 
+    // Purchase
+
+    /**
+     * @notice Buy a listed NFT at the exact listed price.
+     * @dev CEI order: checks → deactivate listing → transfer NFT → distribute ETH.
+     *      Transferring the NFT before ETH payouts prevents any ETH receiver from
+     *      re-entering while the token is still in the seller's wallet.
+     */
     function buyNFT(
         address nftContract,
         uint256 tokenId
@@ -144,13 +152,17 @@ contract SpaceMarketplace is Ownable {
         Listing memory listing = listings[nftContract][tokenId];
         IERC721 nft = IERC721(nftContract);
 
+        // Checks
         if (!listing.active) revert NotListed();
         if (msg.value != listing.price) revert IncorrectETHAmount();
         if (nft.ownerOf(tokenId) != listing.seller) revert NotNFTOwner();
 
+        // Effects
         listings[nftContract][tokenId].active = false;
 
+        // Interactions — NFT transfer first, then ETH
         nft.safeTransferFrom(listing.seller, msg.sender, tokenId);
+
         _executePayouts(nftContract, tokenId, listing.price, listing.seller);
 
         emit NFTSold(
@@ -162,74 +174,28 @@ contract SpaceMarketplace is Ownable {
         );
     }
 
-    function makeOffer(
-        address nftContract,
-        uint256 tokenId
-    ) external payable nonReentrant {
-        if (msg.value == 0) revert ZeroPrice();
-        if (offers[nftContract][tokenId][msg.sender] != 0)
-            revert OfferAlreadyExists();
+    // Admin
 
-        offers[nftContract][tokenId][msg.sender] = msg.value;
-
-        emit OfferMade(nftContract, tokenId, msg.sender, msg.value);
+    function updatePlatformFee(uint256 newFeeBps) external onlyOwner {
+        if (newFeeBps > 1000) revert FeeTooHigh();
+        platformFeeBps = newFeeBps;
     }
 
-    function acceptOffer(
-        address nftContract,
-        uint256 tokenId,
-        address bidder
-    ) external nonReentrant {
-        IERC721 nft = IERC721(nftContract);
-        if (nft.ownerOf(tokenId) != msg.sender) revert NotNFTOwnerForOffer();
-        if (
-            nft.getApproved(tokenId) != address(this) &&
-            !nft.isApprovedForAll(msg.sender, address(this))
-        ) revert MarketplaceNotApproved();
-
-        uint256 offerAmount = offers[nftContract][tokenId][bidder];
-        if (offerAmount == 0) revert NoOfferFromBidder();
-
-        offers[nftContract][tokenId][bidder] = 0;
-
-        if (listings[nftContract][tokenId].active) {
-            listings[nftContract][tokenId].active = false;
-            emit NFTDelisted(nftContract, tokenId);
-        }
-
-        _executePayouts(nftContract, tokenId, offerAmount, payable(msg.sender));
-        nft.safeTransferFrom(msg.sender, bidder, tokenId);
-
-        emit OfferAccepted(
-            nftContract,
-            tokenId,
-            msg.sender,
-            bidder,
-            offerAmount
-        );
+    function updateFeeRecipient(
+        address payable newRecipient
+    ) external onlyOwner {
+        if (newRecipient == address(0)) revert ZeroAddress();
+        feeRecipient = newRecipient;
     }
 
-    function withdrawOffer(
-        address nftContract,
-        uint256 tokenId
-    ) external nonReentrant {
-        uint256 offerAmount = offers[nftContract][tokenId][msg.sender];
-        if (offerAmount == 0) revert NoOfferToWithdraw();
-
-        offers[nftContract][tokenId][msg.sender] = 0;
-
-        (bool ok, ) = payable(msg.sender).call{value: offerAmount}("");
-        if (!ok) revert ETHTransferFailed();
-
-        emit OfferWithdrawn(nftContract, tokenId, msg.sender, offerAmount);
-    }
+    // Internal helpers
 
     function _executePayouts(
         address nftContract,
         uint256 tokenId,
         uint256 totalPrice,
         address payable seller
-    ) private {
+    ) internal {
         uint256 royaltyAmount = 0;
         address royaltyReceiver = address(0);
 
@@ -242,24 +208,21 @@ contract SpaceMarketplace is Ownable {
         } catch {}
 
         uint256 platformFee = (totalPrice * platformFeeBps) / 10_000;
-        if (royaltyAmount + platformFee > totalPrice) {
-            revert InvalidRoyaltyAmount();
-        }
+        if (royaltyAmount + platformFee > totalPrice) revert InvalidRoyaltyAmount();
         uint256 sellerAmount = totalPrice - royaltyAmount - platformFee;
 
         if (royaltyAmount > 0 && royaltyReceiver != address(0)) {
-            (bool okRoyalty, ) = payable(royaltyReceiver).call{
-                value: royaltyAmount
-            }("");
+            (bool okRoyalty, ) = payable(royaltyReceiver).call{value: royaltyAmount}("");
             if (!okRoyalty) revert ETHTransferFailed();
         }
-
         if (platformFee > 0) {
             (bool okFee, ) = feeRecipient.call{value: platformFee}("");
             if (!okFee) revert ETHTransferFailed();
         }
-
         (bool okSeller, ) = seller.call{value: sellerAmount}("");
         if (!okSeller) revert ETHTransferFailed();
     }
+
+    // Upgrade authorisation
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 }

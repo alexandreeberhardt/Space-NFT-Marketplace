@@ -3,14 +3,16 @@ import fs from "fs";
 import path from "path";
 
 /**
- * Upgrades the SpaceInvaderNFT UUPS proxy from V1 to V2.
+ * Upgrades the SpaceMarketplace UUPS proxy from V1 to V2.
+ * V2 adds the offer system (makeOffer / acceptOffer / withdrawOffer).
+ * All existing listings and platform configuration are preserved.
  *
  * Usage:
  *   npx hardhat run scripts/upgrade.ts --network sepolia
  *   npx hardhat run scripts/upgrade.ts --network localhost
  *
  * Prerequisites:
- *   - contracts/SpaceInvaderNFTV2.sol must be compiled
+ *   - contracts/SpaceMarketplaceV2.sol must be compiled
  *   - deployments/<network>.json must exist (run deploy.ts first)
  *   - the deployer account must be the proxy owner
  */
@@ -18,7 +20,7 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   const networkName = network.name === "hardhat" ? "localhost" : network.name;
 
-  console.log(`Upgrading SpaceInvaderNFT to V2`);
+  console.log(`Upgrading SpaceMarketplace V1 → V2`);
   console.log(`Network  : ${networkName}`);
   console.log(`Deployer : ${deployer.address}\n`);
 
@@ -33,33 +35,33 @@ async function main() {
   }
 
   const deployment = JSON.parse(fs.readFileSync(deploymentsPath, "utf8"));
-  const proxyAddress: string = deployment.nft.proxy;
+  const proxyAddress: string = deployment.marketplace.proxy;
 
   if (!proxyAddress) {
-    throw new Error("deployment.nft.proxy is missing in the deployment file.");
+    throw new Error("deployment.marketplace.proxy is missing in the deployment file.");
   }
 
-  console.log(`Current proxy      : ${proxyAddress}`);
-  console.log(`Current impl (V1)  : ${deployment.nft.implementation}`);
+  console.log(`Current proxy (V1) : ${proxyAddress}`);
+  console.log(`Current impl       : ${deployment.marketplace.implementation}`);
 
   // Upgrade proxy to V2
-  const V2Factory = await ethers.getContractFactory("SpaceInvaderNFTV2");
+  const V2Factory = await ethers.getContractFactory("SpaceMarketplaceV2");
   const upgraded = await upgrades.upgradeProxy(proxyAddress, V2Factory, {
     kind: "uups",
+    call: "initializeV2",
+    unsafeAllow: ["missing-initializer"],
   });
   await upgraded.waitForDeployment();
 
-  const newImplAddress = await upgrades.erc1967.getImplementationAddress(
-    proxyAddress
-  );
+  const newImplAddress = await upgrades.erc1967.getImplementationAddress(proxyAddress);
 
   console.log(`\nUpgrade successful.`);
   console.log(`Proxy (unchanged)  : ${proxyAddress}`);
   console.log(`New impl (V2)      : ${newImplAddress}`);
 
   // Persist updated deployment record
-  deployment.nft.implementation = newImplAddress;
-  deployment.nft.version = "V2";
+  deployment.marketplace.implementation = newImplAddress;
+  deployment.marketplace.version = "V2";
   deployment.upgradedAt = new Date().toISOString();
 
   fs.writeFileSync(deploymentsPath, JSON.stringify(deployment, null, 2));

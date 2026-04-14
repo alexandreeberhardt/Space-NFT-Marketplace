@@ -26,15 +26,21 @@ async function main() {
   console.log(`  Proxy:          ${nftProxyAddress}`);
   console.log(`  Implementation: ${nftImplAddress}`);
 
-  // Deploy SpaceMarketplace (immutable, no proxy)
+  // Deploy SpaceMarketplaceV1 (UUPS proxy)
   // 2.5% platform fee (250 bps), fee recipient = deployer
-  console.log("\nDeploying SpaceMarketplace...");
-  const MarketFactory = await ethers.getContractFactory("SpaceMarketplace");
-  const market = await MarketFactory.deploy(250, deployer.address);
+  console.log("\nDeploying SpaceMarketplaceV1 (UUPS proxy)...");
+  const MarketFactory = await ethers.getContractFactory("SpaceMarketplaceV1");
+  const market = await upgrades.deployProxy(
+    MarketFactory,
+    [250, deployer.address],
+    { kind: "uups" }
+  );
   await market.waitForDeployment();
 
   const marketAddress = await market.getAddress();
-  console.log(`  Address:        ${marketAddress}`);
+  const marketImplAddress = await upgrades.erc1967.getImplementationAddress(marketAddress);
+  console.log(`  Proxy:          ${marketAddress}`);
+  console.log(`  Implementation: ${marketImplAddress}`);
 
   // Persist addresses to deployments/<network>.json
   const networkName = network.name === "hardhat" ? "localhost" : network.name;
@@ -56,8 +62,9 @@ async function main() {
       explorer: explorerBase ? `${explorerBase}${nftProxyAddress}` : "",
     },
     marketplace: {
-      address: marketAddress,
-      version: "1",
+      proxy: marketAddress,
+      implementation: marketImplAddress,
+      version: "V1",
       explorer: explorerBase ? `${explorerBase}${marketAddress}` : "",
     },
   };
