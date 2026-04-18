@@ -18,10 +18,10 @@ A decentralized NFT marketplace built on Ethereum (Sepolia testnet). Space Invad
 
 | Component | Technology | Notes |
 |---|---|---|
-| Smart contracts | Solidity 0.8.28 + OpenZeppelin v5 | NFT (V1→V2) + Marketplace (V1→V2) via UUPS proxy |
+| Smart contracts | Solidity 0.8.28 + OpenZeppelin v5 | NFT (V1->V2) + Marketplace (V1->V2) via UUPS proxy |
 | Development framework | Hardhat v2 + TypeScript | Tests with Mocha/Chai |
 | NFT standard | ERC-721 + ERC-2981 (royalties) | `SpaceInvaderNFT.sol` |
-| Marketplace | Fixed-price sales + offer system | `SpaceMarketplaceV1.sol` → `SpaceMarketplaceV2.sol` |
+| Marketplace | Fixed-price sales + offer system | `SpaceMarketplaceV1.sol` -> `SpaceMarketplaceV2.sol` |
 | Storage | IPFS via Pinata | Images + metadata JSON |
 | Frontend | React + Vite + wagmi v2 + viem | MetaMask / WalletConnect |
 | Testnet | Ethereum Sepolia | chainId 11155111 |
@@ -48,7 +48,7 @@ SpaceMarketplace   -> UUPS proxy (v1) + upgrade to v2 (SpaceMarketplaceV2)
 
 ## Prerequisites
 
-- Node.js **v22 LTS** (v18+ minimum — v25 breaks Hardhat)
+- Node.js **v22 LTS** (v18+ minimum - v25 breaks Hardhat)
 - Python 3.10+
 - MetaMask with Sepolia ETH ([faucet](https://sepoliafaucet.com) or [Alchemy](https://www.alchemy.com/faucets/ethereum-sepolia))
 - Pinata account (free tier) for IPFS uploads
@@ -110,8 +110,8 @@ Expected output: **19 tests passing** covering:
 8. Duplicate listing prevention
 9. Incorrect ETH amount revert
 10. Marketplace safety checks
-11. **Upgrade SpaceMarketplace v1 → v2** (state preservation + offer system)
-12. **Upgrade SpaceInvaderNFT v1 → v2** (state preservation + max-supply cap)
+11. **Upgrade SpaceMarketplace v1 -> v2** (state preservation + offer system)
+12. **Upgrade SpaceInvaderNFT v1 -> v2** (state preservation + max-supply cap)
 
 ```bash
 # With coverage (bonus):
@@ -160,7 +160,7 @@ npx hardhat run scripts/mintBatch.ts --network sepolia
 
 Addresses are saved to `deployments/sepolia.json`. Copy the NFT proxy address and marketplace address into `frontend/src/contracts/addresses.ts` under key `11155111`.
 
-### Upgrade SpaceMarketplace v1 → v2 (Sepolia)
+### Upgrade SpaceMarketplace v1 -> v2 (Sepolia)
 
 ```bash
 npx hardhat run scripts/upgrade.ts --network sepolia
@@ -218,21 +218,21 @@ The NFT implementation and the marketplace contract are verified on Etherscan.
 
 ## Demo procedure
 
-1. **Connect wallet** — open `http://localhost:5173` (or the deployed URL), click "Connect Wallet", select MetaMask on Sepolia testnet. The header shows your truncated address.
+1. **Connect wallet** - open `http://localhost:5173` (or the deployed URL), click "Connect Wallet", select MetaMask on Sepolia testnet. The header shows your truncated address.
 
-2. **Browse the gallery** — the Gallery tab fetches all minted tokens and displays active listings with image, price, and seller address.
+2. **Browse the gallery** - the Gallery tab fetches all minted tokens and displays active listings with image, price, and seller address.
 
-3. **Buy an NFT** — click "Buy Now" on any listed card. MetaMask prompts a transaction for exactly the listed price. After 1 confirmation the card disappears from active listings.
+3. **Buy an NFT** - click "Buy Now" on any listed card. MetaMask prompts a transaction for exactly the listed price. After 1 confirmation the card disappears from active listings.
 
-4. **List an NFT you own** — go to "List NFT", enter a token ID you own, approve the marketplace (Step 1), then set a price and list (Step 2). Two transactions, each confirmed on-chain.
+4. **List an NFT you own** - go to "List NFT", enter a token ID you own, approve the marketplace (Step 1), then set a price and list (Step 2). Two transactions, each confirmed on-chain.
 
-5. **Mint an NFT** — go to "Mint", paste an IPFS metadata URI (e.g. from `scripts/tokenURIs.json`), and confirm the transaction.
+5. **Mint an NFT** - go to "Mint", paste an IPFS metadata URI (e.g. from `scripts/tokenURIs.json`), and confirm the transaction.
 
-5b. **Place / accept / withdraw an offer** — go to "Offers". Use "Make Offer" to bid on any token, "Accept Offer" to accept a bid (approve first), or "Withdraw Offer" to reclaim your ETH.
+5b. **Place / accept / withdraw an offer** - go to "Offers". Use "Make Offer" to bid on any token, "Accept Offer" to accept a bid (approve first), or "Withdraw Offer" to reclaim your ETH.
 
-6. **Proof of deployment** — the deployed contract addresses on Sepolia are linked in the "Deployed Contracts" section above. Both the NFT implementation and the marketplace are verified on Etherscan.
+6. **Proof of deployment** - the deployed contract addresses on Sepolia are linked in the "Deployed Contracts" section above. Both the NFT implementation and the marketplace are verified on Etherscan.
 
-7. **Proof of v1 → v2 upgrade** — after running `npx hardhat run scripts/upgrade.ts --network sepolia`, the proxy address stays the same but the implementation address changes. The new implementation is visible on Etherscan under the proxy's "Read as Proxy" tab. The `setMaxSupply` function becomes available, while all existing token state is intact.
+7. **Proof of v1 -> v2 upgrade** - after running `npx hardhat run scripts/upgrade.ts --network sepolia`, the proxy address stays the same but the implementation address changes. The new implementation is visible on Etherscan under the proxy's "Read as Proxy" tab. The `setMaxSupply` function becomes available, while all existing token state is intact.
 
 ---
 
@@ -241,18 +241,18 @@ The NFT implementation and the marketplace contract are verified on Etherscan.
 ```
 contracts/
   SpaceInvaderNFT.sol        ERC-721 + ERC-2981, UUPS (v1)
-  SpaceInvaderNFTV2.sol      ERC-721 + ERC-2981, UUPS (v2 – adds setMaxSupply)
+  SpaceInvaderNFTV2.sol      ERC-721 + ERC-2981, UUPS (v2 - adds setMaxSupply)
   SpaceMarketplaceV1.sol     Fixed-price marketplace, UUPS proxy (v1)
   SpaceMarketplaceV2.sol     Extends V1 with offer system (v2)
 scripts/
   deploy.ts                  Deploy NFT proxy + marketplace V1 proxy
-  upgrade.ts                 Upgrade SpaceMarketplace proxy v1 → v2
+  upgrade.ts                 Upgrade SpaceMarketplace proxy v1 -> v2
   mintBatch.ts               Mint 20 NFTs on-chain
   uploadToIPFS.ts            Upload images + metadata to Pinata
   extract_attributes.py      Extract seed/color attributes
   copyAbis.ts                Copy ABIs to frontend
 test/
-  SpaceMarketplace.test.ts   18 automated tests (incl. upgrade v1→v2)
+  SpaceMarketplace.test.ts   18 automated tests (incl. upgrade v1->v2)
 frontend/
   src/
     wagmi.config.ts          Chain + connector config
