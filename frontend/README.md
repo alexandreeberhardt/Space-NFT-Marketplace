@@ -28,6 +28,7 @@ npm install
 
 ```bash
 npm run dev       # Dev server at http://localhost:5173
+npm run lint      # ESLint checks
 npm run build     # Production build -> dist/
 npm run preview   # Preview production build locally
 ```

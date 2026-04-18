@@ -44,7 +44,7 @@ SpaceMarketplace   -> UUPS proxy (v1) + upgrade to v2 (SpaceMarketplaceV2)
 
 ---
 
-> **Node.js version**: Use Node.js **v22 LTS**. Node v25+ is incompatible with Hardhat and will produce a `MODULE_NOT_FOUND` error. Use `nvm use 22` or check `.nvmrc`.
+> **Node.js version**: Use Node.js **v22 LTS**. The Hardhat toolchain in this repo is validated on Node 22. Use `nvm use 22` or check `.nvmrc`.
 
 ## Prerequisites
 
@@ -86,7 +86,7 @@ pip install -r requirements.txt
 ## Compile
 
 ```bash
-npx hardhat compile
+npm run compile
 # Copy ABIs to frontend after compiling:
 npx hardhat run scripts/copyAbis.ts
 ```
@@ -96,7 +96,7 @@ npx hardhat run scripts/copyAbis.ts
 ## Test
 
 ```bash
-npx hardhat test
+npm test
 ```
 
 Expected output: **19 tests passing** covering:
@@ -116,6 +116,19 @@ Expected output: **19 tests passing** covering:
 ```bash
 # With coverage (bonus):
 npx hardhat coverage
+```
+
+## Verification
+
+```bash
+# Root
+npm run compile
+npm test
+
+# Frontend
+cd frontend
+npm run lint
+npm run build
 ```
 
 ---
@@ -178,6 +191,7 @@ cp .env.example .env
 # Fill in VITE_SEPOLIA_RPC_URL and VITE_WALLETCONNECT_PROJECT_ID
 
 npm install
+npm run lint
 npm run dev
 # Opens at http://localhost:5173
 ```
@@ -244,22 +258,24 @@ contracts/
   SpaceInvaderNFTV2.sol      ERC-721 + ERC-2981, UUPS (v2 - adds setMaxSupply)
   SpaceMarketplaceV1.sol     Fixed-price marketplace, UUPS proxy (v1)
   SpaceMarketplaceV2.sol     Extends V1 with offer system (v2)
+  TestMaliciousRoyaltyNFT.sol Test helper for royalty edge-case validation
 scripts/
   deploy.ts                  Deploy NFT proxy + marketplace V1 proxy
   upgrade.ts                 Upgrade SpaceMarketplace proxy v1 -> v2
   mintBatch.ts               Mint 20 NFTs on-chain
   uploadToIPFS.ts            Upload images + metadata to Pinata
+  uploadToken21.ts           Upload metadata for an extra token
   extract_attributes.py      Extract seed/color attributes
   copyAbis.ts                Copy ABIs to frontend
 test/
-  SpaceMarketplace.test.ts   18 automated tests (incl. upgrade v1->v2)
+  SpaceMarketplace.test.ts   19 automated tests (incl. upgrade v1->v2)
 frontend/
   src/
     wagmi.config.ts          Chain + connector config
     contracts/               Addresses + ABIs
-    components/              Gallery, NFTCard, ConnectButton, forms
+    components/              Gallery, NFTCard, ConnectButton, List/Mint/Offer forms
     hooks/useNFTMarket.ts    wagmi read/write hooks
-    utils/                   ipfsToHttp, formatError
+    utils/                   ipfs, formatError
 generate_invaders.py         Procedural image generator
 deployments/                 Deployed addresses (per network)
 ```

@@ -71,7 +71,8 @@ contract SpaceInvaderNFTV2 is
      *      Parent contracts are already initialized from V1; calling them again
      *      here is intentionally omitted (they are no-ops after first init).
      *      maxSupply defaults to 0 (no cap) - no new state to set.
-     * @custom:oz-upgrades-unsafe-allow missing-initializer
+     * @custom:oz-upgrades-validate-as-initializer
+     * @custom:oz-upgrades-unsafe-allow missing-initializer missing-initializer-call
      */
     function initializeV2() external reinitializer(2) {}
 

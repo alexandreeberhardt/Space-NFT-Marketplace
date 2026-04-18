@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useChainId } from "wagmi";
 import { useMakeOffer, useAcceptOffer, useWithdrawOffer, useAddresses } from "../hooks/useNFTMarket";
 import { formatError } from "../utils/formatError";
@@ -17,15 +17,9 @@ function MakeOfferForm() {
   const [tokenId, setTokenId] = useState("");
   const [amount, setAmount] = useState("");
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    if (isConfirmed) setDone(true);
-  }, [isConfirmed]);
 
   const handleSubmit = async () => {
     setError("");
-    setDone(false);
     try {
       await makeOffer(BigInt(tokenId), amount);
     } catch (e) {
@@ -36,11 +30,10 @@ function MakeOfferForm() {
   const reset = () => {
     setTokenId("");
     setAmount("");
-    setDone(false);
     setError("");
   };
 
-  if (done) {
+  if (isConfirmed) {
     return (
       <div>
         <p className="success">Offer of {amount} ETH placed on token #{tokenId}!</p>
@@ -107,10 +100,6 @@ function AcceptOfferForm() {
   const [step, setStep] = useState<"idle" | "approving" | "approved" | "accepting" | "done">("idle");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (isConfirmed && step === "accepting") setStep("done");
-  }, [isConfirmed, step]);
-
   const handleApprove = async () => {
     setError("");
     setStep("approving");
@@ -141,7 +130,7 @@ function AcceptOfferForm() {
     setError("");
   };
 
-  if (step === "done") {
+  if (step === "done" || (step === "accepting" && isConfirmed)) {
     return (
       <div>
         <p className="success">Offer accepted! Token #{tokenId} transferred to {bidder.slice(0, 6)}...{bidder.slice(-4)}.</p>
@@ -221,15 +210,9 @@ function WithdrawOfferForm() {
 
   const [tokenId, setTokenId] = useState("");
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    if (isConfirmed) setDone(true);
-  }, [isConfirmed]);
 
   const handleSubmit = async () => {
     setError("");
-    setDone(false);
     try {
       await withdrawOffer(BigInt(tokenId));
     } catch (e) {
@@ -239,11 +222,10 @@ function WithdrawOfferForm() {
 
   const reset = () => {
     setTokenId("");
-    setDone(false);
     setError("");
   };
 
-  if (done) {
+  if (isConfirmed) {
     return (
       <div>
         <p className="success">Offer on token #{tokenId} withdrawn. ETH reclaimed.</p>
