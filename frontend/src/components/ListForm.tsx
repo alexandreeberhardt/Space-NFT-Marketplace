@@ -7,7 +7,7 @@ import {
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { parseEther } from "viem";
-import { useAddresses } from "../hooks/useNFTMarket";
+import { useAddresses, useNFTData } from "../hooks/useNFTMarket";
 import NFT_ABI from "../contracts/abis/SpaceInvaderNFT.json";
 import MARKET_ABI from "../contracts/abis/SpaceMarketplace.json";
 import { formatError } from "../utils/formatError";
@@ -18,6 +18,7 @@ export function ListForm() {
   const addrs = useAddresses(chainId);
   const publicClient = usePublicClient();
 
+  const { ownedUnlisted } = useNFTData(chainId);
   const [tokenId, setTokenId] = useState("");
   const [price, setPrice] = useState("");
   const [step, setStep] = useState<"idle" | "approving" | "approved" | "listing" | "listed">("idle");
@@ -152,6 +153,17 @@ export function ListForm() {
   return (
     <div className="list-form">
       <h2>List an NFT</h2>
+
+      {ownedUnlisted.length > 0 && step === "idle" && (
+        <div className="nft-hints">
+          <span>Your unlisted NFTs:</span>
+          {ownedUnlisted.map((id) => (
+            <button key={id.toString()} className="hint-chip" onClick={() => setTokenId(id.toString())}>
+              #{id.toString()}
+            </button>
+          ))}
+        </div>
+      )}
 
       <label>
         Token ID

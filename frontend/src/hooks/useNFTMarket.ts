@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   useAccount,
   usePublicClient,
   useReadContract,
+  useReadContracts,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
@@ -65,6 +66,177 @@ export function useTotalSupply(chainId: number | undefined) {
   });
 }
 
+/**
+ * Reads ownership, listings and offers for all tokens in one multicall batch.
+ * Returns:
+ *   ownedUnlisted  — token IDs owned by user and not currently listed
+ *   ownedTokenIds  — all token IDs owned by user
+ *   userOffers     — { tokenId, amount } where user has a pending offer
+ *   allTokenIds    — every minted token ID (1..totalSupply)
+ */
+export function useNFTData(chainId: number | undefined) {
+  const addrs = useAddresses(chainId);
+  const { address } = useAccount();
+
+  const { data: supplyData } = useTotalSupply(chainId);
+  const total = supplyData ? Number(supplyData as bigint) : 0;
+
+  const tokenIds = useMemo(
+    () => Array.from({ length: total }, (_, i) => BigInt(i + 1)),
+    [total]
+  );
+
+  const ownerOfCalls = useMemo(
+    () =>
+      tokenIds.map((id) => ({
+        address: addrs?.nft as `0x${string}`,
+        abi: NFT_ABI as any,
+        functionName: "ownerOf" as const,
+        args: [id],
+      })),
+    [tokenIds, addrs?.nft]
+  );
+
+  const listingCalls = useMemo(
+    () =>
+      tokenIds.map((id) => ({
+        address: addrs?.marketplace as `0x${string}`,
+        abi: MARKET_ABI as any,
+        functionName: "listings" as const,
+        args: [addrs?.nft, id],
+      })),
+    [tokenIds, addrs]
+  );
+
+  const offerCalls = useMemo(
+    () =>
+      tokenIds.map((id) => ({
+        address: addrs?.marketplace as `0x${string}`,
+        abi: MARKET_ABI as any,
+        functionName: "offers" as const,
+        args: [addrs?.nft, id, address],
+      })),
+    [tokenIds, addrs, address]
+  );
+
+  const { data: ownerData } = useReadContracts({
+    contracts: ownerOfCalls,
+    query: { enabled: !!addrs && total > 0 },
+  });
+
+  const { data: listingData } = useReadContracts({
+    contracts: listingCalls,
+    query: { enabled: !!addrs && total > 0 },
+  });
+
+  const { data: offerData } = useReadContracts({
+    contracts: offerCalls,
+    query: { enabled: !!addrs && !!address && total > 0 },
+  });
+
+  const ownedTokenIds = useMemo(() => {
+    if (!ownerData || !address) return [];
+    return tokenIds.filter((_, i) => {
+      const r = ownerData[i];
+      return r?.status === "success" && (r.result as string).toLowerCase() === address.toLowerCase();
+    });
+  }, [ownerData, tokenIds, address]);
+
+  const ownedUnlisted = useMemo(() => {
+    if (!listingData) return ownedTokenIds;
+    return ownedTokenIds.filter((id) => {
+      const idx = tokenIds.indexOf(id);
+      const r = listingData[idx];
+      const listing = r?.result as { active: boolean } | undefined;
+      return !listing?.active;
+    });
+  }, [ownedTokenIds, listingData, tokenIds]);
+
+  const userOffers = useMemo(() => {
+    if (!offerData) return [];
+    return tokenIds
+      .map((id, i) => ({ tokenId: id, amount: offerData[i]?.result as bigint | undefined }))
+      .filter((o) => o.amount && o.amount > 0n);
+  }, [offerData, tokenIds]);
+
+  return { ownedUnlisted, ownedTokenIds, userOffers, allTokenIds: tokenIds };
+}
+
+export interface OfferInfo {
+  tokenId: bigint;
+  bidder: `0x${string}`;
+  amount: bigint;
+}
+
+const OFFER_CACHE_KEY = "space-nft-offers";
+
+interface CachedOffer {
+  chainId: number;
+  tokenId: string;
+  bidder: string;
+  amount: string;
+}
+
+export function saveCachedOffer(offer: CachedOffer) {
+  try {
+    const existing: CachedOffer[] = JSON.parse(localStorage.getItem(OFFER_CACHE_KEY) || "[]");
+    const key = `${offer.chainId}-${offer.tokenId}-${offer.bidder.toLowerCase()}`;
+    const filtered = existing.filter(
+      (o) => `${o.chainId}-${o.tokenId}-${o.bidder.toLowerCase()}` !== key
+    );
+    localStorage.setItem(OFFER_CACHE_KEY, JSON.stringify([...filtered, offer]));
+  } catch {}
+}
+
+/**
+ * Returns active offers on NFTs owned by the current user.
+ * Reads bidder/tokenId from localStorage (saved when making offers),
+ * then verifies live amounts on-chain via multicall.
+ */
+export function useOffersOnMyNFTs(chainId: number | undefined) {
+  const addrs = useAddresses(chainId);
+  const { ownedTokenIds } = useNFTData(chainId);
+
+  const cachedOffers = useMemo(() => {
+    if (!chainId) return [];
+    try {
+      const all: CachedOffer[] = JSON.parse(localStorage.getItem(OFFER_CACHE_KEY) || "[]");
+      const ownedSet = new Set(ownedTokenIds.map((id) => id.toString()));
+      return all.filter((o) => o.chainId === chainId && ownedSet.has(o.tokenId));
+    } catch {
+      return [];
+    }
+  }, [chainId, ownedTokenIds]);
+
+  const verificationCalls = useMemo(
+    () =>
+      cachedOffers.map((o) => ({
+        address: addrs?.marketplace as `0x${string}`,
+        abi: MARKET_ABI as any,
+        functionName: "offers" as const,
+        args: [addrs?.nft, BigInt(o.tokenId), o.bidder as `0x${string}`],
+      })),
+    [cachedOffers, addrs]
+  );
+
+  const { data: amounts } = useReadContracts({
+    contracts: verificationCalls,
+    query: { enabled: !!addrs && cachedOffers.length > 0 },
+  });
+
+  const offers = useMemo<OfferInfo[]>(() => {
+    return cachedOffers
+      .map((o, i) => ({
+        tokenId: BigInt(o.tokenId),
+        bidder: o.bidder as `0x${string}`,
+        amount: amounts ? ((amounts[i]?.result as bigint) ?? 0n) : BigInt(o.amount),
+      }))
+      .filter((o) => o.amount > 0n);
+  }, [cachedOffers, amounts]);
+
+  return { offers, loading: false, fetchError: null };
+}
+
 /** Buy NFT hook: returns { buy, hash, isPending, isConfirmed } */
 export function useBuyNFT(chainId: number | undefined) {
   const addrs = useAddresses(chainId);
@@ -76,6 +248,7 @@ export function useBuyNFT(chainId: number | undefined) {
     confirmations: 1,
   });
 
+  const { address } = useAccount();
   const buy = async (tokenId: bigint, price: bigint) => {
     if (!addrs) {
       throw new Error("Contracts not deployed on this network.");
@@ -84,6 +257,7 @@ export function useBuyNFT(chainId: number | undefined) {
       throw new Error("RPC client unavailable for this network.");
     }
     const gas = await publicClient.estimateContractGas({
+      account: address,
       address: addrs.marketplace,
       abi: MARKET_ABI,
       functionName: "buyNFT",
@@ -247,6 +421,7 @@ export function useWithdrawOffer(chainId: number | undefined) {
       abi: MARKET_ABI,
       functionName: "withdrawOffer",
       args: [addrs.nft, tokenId],
+      gas: 100000n,
     });
     setHash(txHash);
     return txHash;

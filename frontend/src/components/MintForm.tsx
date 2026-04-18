@@ -68,11 +68,13 @@ export function MintForm() {
         abi: NFT_ABI,
         functionName: "safeMint",
         args: [address, uri],
+        gas: 300000n,
       });
       setHash(txHash);
 
       setStep("confirming");
-      await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1 });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1 });
+      if (receipt.status === "reverted") throw new Error("Transaction reverted. The mint failed (max supply may be reached).");
 
       const supply = await publicClient.readContract({
         address: addrs.nft,
