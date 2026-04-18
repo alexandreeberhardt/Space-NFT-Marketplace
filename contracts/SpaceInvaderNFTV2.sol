@@ -15,10 +15,10 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
  *         All V1 state (tokenIds, tokenURIs, royalties, ownership) is preserved.
  *
  * Storage layout (must match V1 exactly for existing slots):
- *   slot 0 : _nextTokenId   (V1)
- *   slot 1 : _totalMinted   (V1)
- *   slot 2 : maxSupply       (V2 – taken from __gap)
- *   slots 3-49 : __gap[47]  (reduced from V1's __gap[48])
+ *   slot 0 : _nextTokenId (V1)
+ *   slot 1 : _totalMinted (V1)
+ *   slot 2 : maxSupply (V2 - taken from __gap)
+ *   slots 3-49 : __gap[47] (reduced from V1's __gap[48])
  */
 contract SpaceInvaderNFTV2 is
     Initializable,
@@ -28,11 +28,11 @@ contract SpaceInvaderNFTV2 is
     OwnableUpgradeable,
     UUPSUpgradeable
 {
-    // V1 storage – DO NOT reorder or remove
+    // V1 storage - DO NOT reorder or remove
     uint256 private _nextTokenId;
     uint256 private _totalMinted;
 
-    // V2 storage – appended (consumes one slot from __gap)
+    // V2 storage - appended (consumes one slot from __gap)
     uint256 public maxSupply;
 
     uint256[47] private __gap;
@@ -67,10 +67,10 @@ contract SpaceInvaderNFTV2 is
     // -------------------------------------------------------------------------
 
     /**
-     * @dev Upgrade initializer – called once during the v1→v2 proxy upgrade.
+     * @dev Upgrade initializer - called once during the v1->v2 proxy upgrade.
      *      Parent contracts are already initialized from V1; calling them again
      *      here is intentionally omitted (they are no-ops after first init).
-     *      maxSupply defaults to 0 (no cap) — no new state to set.
+     *      maxSupply defaults to 0 (no cap) - no new state to set.
      * @custom:oz-upgrades-unsafe-allow missing-initializer
      */
     function initializeV2() external reinitializer(2) {}

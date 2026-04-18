@@ -20,7 +20,7 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   const networkName = network.name === "hardhat" ? "localhost" : network.name;
 
-  console.log(`Upgrading SpaceMarketplace V1 → V2`);
+  console.log(`Upgrading SpaceMarketplace V1 -> V2`);
   console.log(`Network  : ${networkName}`);
   console.log(`Deployer : ${deployer.address}\n`);
 

@@ -141,7 +141,7 @@ contract SpaceMarketplaceV1 is
 
     /**
      * @notice Buy a listed NFT at the exact listed price.
-     * @dev CEI order: checks → deactivate listing → transfer NFT → distribute ETH.
+     * @dev CEI order: checks -> deactivate listing -> transfer NFT -> distribute ETH.
      *      Transferring the NFT before ETH payouts prevents any ETH receiver from
      *      re-entering while the token is still in the seller's wallet.
      */
@@ -160,7 +160,7 @@ contract SpaceMarketplaceV1 is
         // Effects
         listings[nftContract][tokenId].active = false;
 
-        // Interactions — NFT transfer first, then ETH
+        // Interactions - NFT transfer first, then ETH
         nft.safeTransferFrom(listing.seller, msg.sender, tokenId);
 
         _executePayouts(nftContract, tokenId, listing.price, listing.seller);

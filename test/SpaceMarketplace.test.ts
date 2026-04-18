@@ -373,9 +373,9 @@ describe("8 - Duplicate listing prevention", () => {
 
 // Test 9 - Incorrect ETH amount revert
 
-// Test 11 - Upgrade marketplace v1 → v2
+// Test 11 - Upgrade marketplace v1 -> v2
 
-describe("11 - Upgrade marketplace v1 → v2 (state preservation + offer system)", () => {
+describe("11 - Upgrade marketplace v1 -> v2 (state preservation + offer system)", () => {
   it("preserves V1 listings after upgrade and unlocks the offer system in V2", async () => {
     const [owner, seller, buyer, feeRecipient] = await ethers.getSigners();
 
@@ -432,7 +432,7 @@ describe("11 - Upgrade marketplace v1 → v2 (state preservation + offer system)
     expect(listingAfterUpgrade.price).to.equal(parseEther("1"));
     expect(listingAfterUpgrade.seller).to.equal(seller.address);
 
-    // 5. V2 new feature: offer system — make an offer
+    // 5. V2 new feature: offer system - make an offer
     await expect(
       marketV2
         .connect(buyer)
@@ -445,7 +445,7 @@ describe("11 - Upgrade marketplace v1 → v2 (state preservation + offer system)
       await marketV2.offers(await nft.getAddress(), 1n, buyer.address)
     ).to.equal(parseEther("0.5"));
 
-    // 6. Seller accepts the offer — verifies full payout flow post-upgrade
+    // 6. Seller accepts the offer - verifies full payout flow post-upgrade
     await expect(
       marketV2
         .connect(seller)
@@ -467,9 +467,9 @@ describe("11 - Upgrade marketplace v1 → v2 (state preservation + offer system)
   });
 });
 
-// Test 12 - Upgrade NFT SpaceInvaderNFT v1 → v2
+// Test 12 - Upgrade NFT SpaceInvaderNFT v1 -> v2
 
-describe("12 - Upgrade NFT v1 → v2 (state preservation + max-supply cap)", () => {
+describe("12 - Upgrade NFT v1 -> v2 (state preservation + max-supply cap)", () => {
   it("preserves V1 tokens after upgrade and unlocks setMaxSupply in V2", async () => {
     const [owner, minter] = await ethers.getSigners();
 

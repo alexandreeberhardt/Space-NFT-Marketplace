@@ -56,8 +56,8 @@ contract SpaceMarketplaceV2 is SpaceMarketplaceV1 {
     // Reinitializer
 
     /**
-     * @notice Called once during the V1→V2 upgrade via upgradeProxy.
-     *         Parent contracts are already initialized from V1 — no re-init needed.
+     * @notice Called once during the V1->V2 upgrade via upgradeProxy.
+     *         Parent contracts are already initialized from V1 - no re-init needed.
      * @custom:oz-upgrades-unsafe-allow missing-initializer
      */
     function initializeV2() external reinitializer(2) {}
@@ -106,7 +106,7 @@ contract SpaceMarketplaceV2 is SpaceMarketplaceV1 {
             emit NFTDelisted(nftContract, tokenId);
         }
 
-        // Interactions — NFT transfer first, then ETH
+        // Interactions - NFT transfer first, then ETH
         nft.safeTransferFrom(msg.sender, bidder, tokenId);
 
         _executePayouts(nftContract, tokenId, offerAmount, payable(msg.sender));

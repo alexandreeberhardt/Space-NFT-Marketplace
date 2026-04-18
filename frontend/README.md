@@ -1,4 +1,4 @@
-# Space Invader NFT — Frontend
+# Space Invader NFT - Frontend
 
 React + Vite + wagmi v2 frontend for the Space Invader NFT Marketplace.
 
@@ -28,21 +28,21 @@ npm install
 
 ```bash
 npm run dev       # Dev server at http://localhost:5173
-npm run build     # Production build → dist/
+npm run build     # Production build -> dist/
 npm run preview   # Preview production build locally
 ```
 
 ## Features
 
-- **Gallery** — browse all minted NFTs; buy listed ones directly
-- **List NFT** — approve + list any NFT you own (two-step)
-- **Offers** — make an ETH offer on any NFT, accept incoming offers, withdraw your own offers
-- **Mint** — mint a new Space Invader NFT from an IPFS metadata URI
+- **Gallery** - browse all minted NFTs; buy listed ones directly
+- **List NFT** - approve + list any NFT you own (two-step)
+- **Offers** - make an ETH offer on any NFT, accept incoming offers, withdraw your own offers
+- **Mint** - mint a new Space Invader NFT from an IPFS metadata URI
 
 ## Network support
 
 - Sepolia testnet (chainId 11155111)
-- Local Hardhat node (chainId 31337) — update `src/contracts/addresses.ts` after local deploy
+- Local Hardhat node (chainId 31337) - update `src/contracts/addresses.ts` after local deploy
 
 ## Contract addresses
 
