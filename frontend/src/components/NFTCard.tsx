@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useChainId } from "wagmi";
 import { formatEther } from "viem";
-import { ipfsToHttp } from "../utils/ipfs";
+import { ipfsToHttp, fetchWithGatewayFallback } from "../utils/ipfs";
 import { formatError } from "../utils/formatError";
 import { useBuyNFT, useTokenURI } from "../hooks/useNFTMarket";
 
@@ -25,15 +25,17 @@ export function NFTCard({ tokenId, seller, price, active = false, onPurchased }:
   const { data: tokenURIData } = useTokenURI(tokenId, chainId);
 
   const [metadata, setMetadata] = useState<Metadata | null>(null);
+  const [imgError, setImgError] = useState(false);
+  const [metaLoading, setMetaLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!tokenURIData) return;
-    const url = ipfsToHttp(tokenURIData as string);
-    fetch(url)
+    setMetaLoading(true);
+    fetchWithGatewayFallback(tokenURIData as string)
       .then((r) => r.json())
-      .then(setMetadata)
-      .catch(() => setMetadata(null));
+      .then((data) => { setMetadata(data); setMetaLoading(false); })
+      .catch(() => setMetaLoading(false));
   }, [tokenURIData]);
 
   useEffect(() => {
@@ -55,10 +57,21 @@ export function NFTCard({ tokenId, seller, price, active = false, onPurchased }:
         <img
           src={ipfsToHttp(metadata.image)}
           alt={metadata.name || `Space Invader #${tokenId}`}
+          onError={(e) => {
+            const img = e.currentTarget;
+            const idx = parseInt(img.dataset.gwIdx || "0") + 1;
+            if (idx < 4) {
+              img.dataset.gwIdx = String(idx);
+              img.src = ipfsToHttp(metadata.image, idx);
+            } else {
+              setImgError(true);
+            }
+          }}
         />
       ) : (
-        <div className="nft-placeholder">Loading...</div>
+        <div className="nft-placeholder">{metaLoading ? "Loading..." : "No image"}</div>
       )}
+      {imgError && <div className="nft-placeholder">Image unavailable</div>}
 
       <div className="nft-info">
         <h3>{metadata?.name || `Space Invader #${tokenId}`}</h3>

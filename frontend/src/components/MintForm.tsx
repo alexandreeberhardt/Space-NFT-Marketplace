@@ -4,15 +4,14 @@ import {
   useChainId,
   usePublicClient,
   useWriteContract,
-  useWaitForTransactionReceipt,
 } from "wagmi";
 import { useAddresses } from "../hooks/useNFTMarket";
 import NFT_ABI from "../contracts/abis/SpaceInvaderNFT.json";
 import { formatError } from "../utils/formatError";
+import { generateInvaderCanvas, canvasToBlob } from "../utils/generateInvader";
+import { pinFile, pinJSON, isSeedAlreadyMinted } from "../utils/pinataUpload";
 
-// In production, these URIs come from scripts/tokenURIs.json after running uploadToIPFS.ts.
-// For demo, we use a placeholder.
-const PLACEHOLDER_URI = "ipfs://QmPlaceholder/metadata.json";
+type Step = "idle" | "generating" | "uploading" | "signing" | "confirming" | "minted";
 
 export function MintForm() {
   const { address } = useAccount();
@@ -20,98 +19,119 @@ export function MintForm() {
   const addrs = useAddresses(chainId);
   const publicClient = usePublicClient();
 
-  const [recipient, setRecipient] = useState(address || "");
-  const [uri, setUri] = useState(PLACEHOLDER_URI);
+  const [seedInput, setSeedInput] = useState("");
+  const [preview, setPreview] = useState<string | null>(null);
+  const [step, setStep] = useState<Step>("idle");
   const [error, setError] = useState("");
-  const [hash, setHash] = useState<`0x${string}` | undefined>();
-  const [step, setStep] = useState<"idle" | "signing" | "confirming" | "minted">(
-    "idle"
-  );
+  const [hash, setHash] = useState<string | undefined>();
+  const [mintedTokenId, setMintedTokenId] = useState<bigint | null>(null);
 
-  const { writeContractAsync, isPending } = useWriteContract();
-  const { isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
+  const { writeContractAsync } = useWriteContract();
+
+  const seed = parseInt(seedInput, 10);
+  const seedValid = seedInput !== "" && !isNaN(seed) && seed >= 0 && seed <= 10000;
 
   useEffect(() => {
-    if (isSuccess) {
-      setStep("minted");
-    }
-  }, [isSuccess]);
-
-  if (!addrs?.nft) {
-    return <p>Contracts not deployed on this network.</p>;
-  }
+    if (!seedValid) { setPreview(null); return; }
+    setPreview(generateInvaderCanvas(seed).toDataURL("image/png"));
+  }, [seed, seedValid]);
 
   const handleMint = async () => {
+    if (!seedValid || !address || !addrs?.nft || !publicClient) return;
     setError("");
     setHash(undefined);
-    setStep("signing");
+    setMintedTokenId(null);
+
     try {
-      if (!publicClient) {
-        throw new Error("RPC client unavailable for this network.");
-      }
-      if (!address) {
-        throw new Error("Connect your wallet first.");
-      }
-      const gas = await publicClient.estimateContractGas({
-        account: address,
-        address: addrs.nft,
-        abi: NFT_ABI,
-        functionName: "safeMint",
-        args: [recipient, uri],
-      });
+      setStep("generating");
+      const alreadyMinted = await isSeedAlreadyMinted(seed);
+      if (alreadyMinted) throw new Error(`Seed ${seed} has already been minted.`);
+
+      const blob = await canvasToBlob(generateInvaderCanvas(seed));
+
+      setStep("uploading");
+      const imageCid = await pinFile(blob, `space-invader-seed-${seed}.png`);
+      const metaCid = await pinJSON(
+        {
+          name: `Space Invader #${seed}`,
+          description: `A procedurally generated Space Invader NFT. Seed: ${seed}.`,
+          image: `ipfs://${imageCid}`,
+          attributes: [{ trait_type: "Seed", value: seed }],
+        },
+        `space-invader-metadata-seed-${seed}`
+      );
+      const uri = `ipfs://${metaCid}`;
+
+      setStep("signing");
       const txHash = await writeContractAsync({
         address: addrs.nft,
         abi: NFT_ABI,
         functionName: "safeMint",
-        args: [recipient, uri],
-        gas: (gas * 120n) / 100n,
+        args: [address, uri],
       });
       setHash(txHash);
+
       setStep("confirming");
+      await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1 });
+
+      const supply = await publicClient.readContract({
+        address: addrs.nft,
+        abi: NFT_ABI,
+        functionName: "totalSupply",
+      });
+      setMintedTokenId(supply as bigint);
+      setStep("minted");
     } catch (e) {
       setStep("idle");
       setError(formatError(e));
     }
   };
 
+  const stepLabel: Record<Step, string> = {
+    idle: "Mint",
+    generating: "Generating image...",
+    uploading: "Uploading to IPFS...",
+    signing: "Waiting for signature...",
+    confirming: "Confirming on-chain...",
+    minted: "Minted!",
+  };
+
+  if (!addrs?.nft) return <p>Contracts not deployed on this network.</p>;
+
   return (
     <div className="mint-form">
       <h2>Mint NFT</h2>
-      <p>Public minting is enabled. You can mint for yourself or gift directly to another wallet.</p>
+      <p>Enter a seed (0–10 000) to generate your unique Space Invader.</p>
 
       <label>
-        Recipient
+        Seed
         <input
-          type="text"
-          value={recipient}
-          onChange={(e) => setRecipient(e.target.value)}
-          placeholder="0x..."
+          type="number"
+          min={0}
+          max={10000}
+          value={seedInput}
+          onChange={(e) => setSeedInput(e.target.value)}
+          placeholder="0 – 10 000"
+          disabled={step !== "idle"}
         />
       </label>
 
-      <label>
-        Token URI (IPFS)
-        <input
-          type="text"
-          value={uri}
-          onChange={(e) => setUri(e.target.value)}
-          placeholder="ipfs://..."
-        />
-      </label>
+      {preview && (
+        <div className="mint-preview">
+          <img src={preview} alt={`Space Invader seed ${seed}`} />
+          <span>Seed {seed}</span>
+        </div>
+      )}
 
-      <button onClick={handleMint} disabled={step !== "idle" || !recipient || !uri}>
-        {step === "signing" && !hash
-          ? "Waiting for signature..."
-          : step === "confirming"
-            ? "Confirming mint..."
-            : step === "minted"
-              ? "Minted!"
-              : isPending
-                ? "Waiting for signature..."
-                : "Mint"}
+      <button onClick={handleMint} disabled={!seedValid || step !== "idle"}>
+        {stepLabel[step]}
       </button>
 
-      {step === "minted" && <p className="success">NFT minted! Tx: {hash}</p>}
+      {step === "minted" && (
+        <p className="success">
+          NFT minted! Token ID: {mintedTokenId?.toString() ?? "?"}. Tx: {hash}
+        </p>
+      )}
       {error && <p className="error">{error}</p>}
     </div>
   );
