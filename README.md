@@ -18,7 +18,7 @@ A decentralized NFT marketplace built on Ethereum (Sepolia testnet). Space Invad
 
 | Component | Technology | Notes |
 |---|---|---|
-| Smart contracts | Solidity 0.8.28 + OpenZeppelin v5 | NFT (V1->V2) + Marketplace (V1->V2) via UUPS proxy |
+| Smart contracts | Solidity 0.8.28 + OpenZeppelin v5 | NFT + Marketplace (V1->V2) via UUPS proxy |
 | Development framework | Hardhat v2 + TypeScript | Tests with Mocha/Chai |
 | NFT standard | ERC-721 + ERC-2981 (royalties) | `SpaceInvaderNFT.sol` |
 | Marketplace | Fixed-price sales + offer system | `SpaceMarketplaceV1.sol` -> `SpaceMarketplaceV2.sol` |
@@ -38,7 +38,7 @@ Buyer (1 ETH)
 ### Deployment model
 
 ```
-SpaceInvaderNFT    -> UUPS proxy (v1) + upgrade to v2 (SpaceInvaderNFTV2)
+SpaceInvaderNFT    -> UUPS proxy
 SpaceMarketplace   -> UUPS proxy (v1) + upgrade to v2 (SpaceMarketplaceV2)
 ```
 
@@ -111,7 +111,6 @@ Expected output: **19 tests passing** covering:
 9. Incorrect ETH amount revert
 10. Marketplace safety checks
 11. **Upgrade SpaceMarketplace v1 -> v2** (state preservation + offer system)
-12. **Upgrade SpaceInvaderNFT v1 -> v2** (state preservation + max-supply cap)
 
 ```bash
 # With coverage (bonus):
@@ -210,9 +209,9 @@ npm run build
 | Contract | Proxy / Address | Implementation | Explorer |
 |---|---|---|---|
 | SpaceInvaderNFT (proxy) | `0x3a5d2721257a26DaBdD6A14b64C0634ffC8dCCD3` | `0x2e99f91DC50D704e3339ecdCC943821a54A33fA8` (V1) | [Etherscan](https://sepolia.etherscan.io/address/0x3a5d2721257a26DaBdD6A14b64C0634ffC8dCCD3) |
-| SpaceMarketplace (proxy) | `0xAA5038Faf52ac76EebFaa8C3865D8110B6f9369B` | `0x022E69F1664aEAB6C991B81142E0BcD751039ce3` (V2) | [Etherscan](https://sepolia.etherscan.io/address/0xAA5038Faf52ac76EebFaa8C3865D8110B6f9369B) |
+| SpaceMarketplace (proxy) | `0xAA5038Faf52ac76EebFaa8C3865D8110B6f9369B` | `0x04c3012dBc38945d1aBbC2cEAeEDC17dC9048a0a` (current implementation shown by Etherscan) | [Etherscan](https://sepolia.etherscan.io/address/0xAA5038Faf52ac76EebFaa8C3865D8110B6f9369B) |
 
-The NFT implementation and the marketplace contract are verified on Etherscan.
+The NFT implementation is verified on Etherscan. For the marketplace, use the proxy page above as the source of truth for the current implementation address.
 
 ---
 
@@ -225,7 +224,6 @@ The NFT implementation and the marketplace contract are verified on Etherscan.
 - **Input validation** on all public entry points (`ZeroPrice`, `ZeroAddress`, `FeeTooHigh`).
 - **Private key** never committed - use `.env` (gitignored).
 - **SpaceMarketplace is upgradeable via UUPS**: V1 deployed as proxy, upgraded to V2 (adds offer system). `_authorizeUpgrade` gated by `onlyOwner`.
-- **SpaceInvaderNFT UUPS upgrade** gated by `onlyOwner` via `_authorizeUpgrade`. V2 adds `setMaxSupply`.
 - **Platform fee** capped at 10% (1000 bps) to prevent owner rug.
 
 ---
@@ -246,7 +244,7 @@ The NFT implementation and the marketplace contract are verified on Etherscan.
 
 6. **Proof of deployment** - the deployed contract addresses on Sepolia are linked in the "Deployed Contracts" section above. Both the NFT implementation and the marketplace are verified on Etherscan.
 
-7. **Proof of v1 -> v2 upgrade** - after running `npx hardhat run scripts/upgrade.ts --network sepolia`, the proxy address stays the same but the implementation address changes. The new implementation is visible on Etherscan under the proxy's "Read as Proxy" tab. The `setMaxSupply` function becomes available, while all existing token state is intact.
+7. **Proof of v1 -> v2 upgrade** - after running `npx hardhat run scripts/upgrade.ts --network sepolia`, the `SpaceMarketplace` proxy address stays the same but the implementation address changes. The new implementation is visible on Etherscan under the proxy's "Read as Proxy" tab, while all existing marketplace state is intact.
 
 ---
 
@@ -255,7 +253,6 @@ The NFT implementation and the marketplace contract are verified on Etherscan.
 ```
 contracts/
   SpaceInvaderNFT.sol        ERC-721 + ERC-2981, UUPS (v1)
-  SpaceInvaderNFTV2.sol      ERC-721 + ERC-2981, UUPS (v2 - adds setMaxSupply)
   SpaceMarketplaceV1.sol     Fixed-price marketplace, UUPS proxy (v1)
   SpaceMarketplaceV2.sol     Extends V1 with offer system (v2)
   TestMaliciousRoyaltyNFT.sol Test helper for royalty edge-case validation
