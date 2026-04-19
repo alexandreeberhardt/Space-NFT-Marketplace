@@ -62,9 +62,7 @@ contract SpaceInvaderNFTV2 is
         _disableInitializers();
     }
 
-    // -------------------------------------------------------------------------
     // V2 initializer (called once during upgrade)
-    // -------------------------------------------------------------------------
 
     /**
      * @dev Upgrade initializer - called once during the v1->v2 proxy upgrade.
@@ -76,9 +74,7 @@ contract SpaceInvaderNFTV2 is
      */
     function initializeV2() external reinitializer(2) {}
 
-    // -------------------------------------------------------------------------
     // V2 feature: optional max-supply cap
-    // -------------------------------------------------------------------------
 
     /**
      * @notice Sets the maximum number of tokens that can ever be minted.
@@ -91,9 +87,7 @@ contract SpaceInvaderNFTV2 is
         emit MaxSupplyUpdated(_maxSupply);
     }
 
-    // -------------------------------------------------------------------------
     // Minting (same interface as V1, now cap-aware)
-    // -------------------------------------------------------------------------
 
     function mint(string calldata uri) external returns (uint256 tokenId) {
         return safeMint(msg.sender, uri);
@@ -119,15 +113,11 @@ contract SpaceInvaderNFTV2 is
         return _totalMinted;
     }
 
-    // -------------------------------------------------------------------------
     // Upgrade authorisation
-    // -------------------------------------------------------------------------
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    // -------------------------------------------------------------------------
     // Required overrides
-    // -------------------------------------------------------------------------
 
     function tokenURI(
         uint256 tokenId
