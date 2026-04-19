@@ -15,7 +15,9 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
  * Security:
  *  - Checks-Effects-Interactions pattern: listing deactivated, NFT transferred,
  *    then ETH distributed.
- *  - Reentrancy guard implemented inline (avoids OZ base constructor conflict).
+ *  - Reentrancy guard implemented inline: OZ v5 removed ReentrancyGuardUpgradeable
+ *    (their base ReentrancyGuard now uses ERC-7201 namespaced storage and has no
+ *    upgradeable variant). The inline uint256 flag is the canonical OZ v5 pattern.
  *  - ETH sent via .call to support smart-contract wallets.
  *  - Platform fee capped at 10%.
  */

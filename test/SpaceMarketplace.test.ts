@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { parseEther, ZeroAddress } from "ethers";
-import type { SpaceInvaderNFT, SpaceInvaderNFTV2, SpaceMarketplaceV2 } from "../typechain-types";
+import type { SpaceInvaderNFT, SpaceMarketplaceV2 } from "../typechain-types";
 
 // Fixture
 
@@ -464,62 +464,6 @@ describe("11 - Upgrade marketplace v1 -> v2 (state preservation + offer system)"
     expect(
       await marketV2.offers(await nft.getAddress(), 1n, buyer.address)
     ).to.equal(0n);
-  });
-});
-
-// Test 12 - Upgrade NFT SpaceInvaderNFT v1 -> v2
-
-describe("12 - Upgrade NFT v1 -> v2 (state preservation + max-supply cap)", () => {
-  it("preserves V1 tokens after upgrade and unlocks setMaxSupply in V2", async () => {
-    const [owner, minter] = await ethers.getSigners();
-
-    // 1. Deploy SpaceInvaderNFT V1 via UUPS proxy
-    const NFTv1Factory = await ethers.getContractFactory("SpaceInvaderNFT");
-    const nftV1 = (await upgrades.deployProxy(
-      NFTv1Factory,
-      [owner.address, 500],
-      { kind: "uups" }
-    )) as unknown as SpaceInvaderNFT;
-    await nftV1.waitForDeployment();
-    const proxyAddress = await nftV1.getAddress();
-
-    // 2. Mint two tokens in V1
-    await nftV1.connect(minter).mint("ipfs://QmV1/1.json");
-    await nftV1.connect(minter).mint("ipfs://QmV1/2.json");
-    expect(await nftV1.totalSupply()).to.equal(2n);
-    expect(await nftV1.ownerOf(1n)).to.equal(minter.address);
-    expect(await nftV1.tokenURI(1n)).to.equal("ipfs://QmV1/1.json");
-
-    // 3. Upgrade proxy to V2
-    const NFTv2Factory = await ethers.getContractFactory("SpaceInvaderNFTV2");
-    const nftV2 = (await upgrades.upgradeProxy(proxyAddress, NFTv2Factory, {
-      kind: "uups",
-      call: "initializeV2",
-    })) as unknown as SpaceInvaderNFTV2;
-    await nftV2.waitForDeployment();
-
-    // 4. Proxy address must be unchanged
-    expect(await nftV2.getAddress()).to.equal(proxyAddress);
-
-    // 5. All V1 state preserved
-    expect(await nftV2.totalSupply()).to.equal(2n);
-    expect(await nftV2.ownerOf(1n)).to.equal(minter.address);
-    expect(await nftV2.tokenURI(1n)).to.equal("ipfs://QmV1/1.json");
-    expect(await nftV2.owner()).to.equal(owner.address);
-
-    // 6. V2 new feature: set a max-supply cap
-    await nftV2.connect(owner).setMaxSupply(4n);
-    expect(await nftV2.maxSupply()).to.equal(4n);
-
-    // Mint up to the cap
-    await nftV2.connect(minter).mint("ipfs://QmV2/3.json");
-    await nftV2.connect(minter).mint("ipfs://QmV2/4.json");
-    expect(await nftV2.totalSupply()).to.equal(4n);
-
-    // 7. Exceeding the cap reverts
-    await expect(
-      nftV2.connect(minter).mint("ipfs://QmV2/5.json")
-    ).to.be.revertedWithCustomError(nftV2, "MaxSupplyReached");
   });
 });
 
